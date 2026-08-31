@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云效代码审计报告 - 工作效能分析</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-light: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --accent: #10b981;
+            --accent-light: #34d399;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --frontend: #8b5cf6;
+            --frontend-light: #a78bfa;
+            --backend: #2563eb;
+            --backend-light: #3b82f6;
+            --bg: #f8fafc;
+            --bg-card: #ffffff;
+            --text: #1e293b;
+            --text-secondary: #64748b;
+            --text-light: #94a3b8;
+            --border: #e2e8f0;
+            --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.06);
+            --radius: 12px;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .header {
+            background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 50%, var(--primary-light) 100%);
+            color: white;
+            padding: 32px 40px;
+            text-align: center;
+        }
+        .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+        .header p { font-size: 14px; color: rgba(255,255,255,0.85); }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px 40px; }
+        .meta-bar {
+            display: flex; gap: 16px; margin-bottom: 24px;
+            flex-wrap: wrap;
+        }
+        .meta-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 20px;
+            flex: 1; min-width: 140px;
+            box-shadow: var(--shadow);
+        }
+        .meta-item .label { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+        .meta-item .value { font-size: 20px; font-weight: 700; color: var(--primary); }
+        .section { margin-bottom: 32px; }
+        .section-title {
+            font-size: 18px; font-weight: 700; color: var(--text);
+            margin-bottom: 16px; padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary);
+        }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            box-shadow: var(--shadow);
+        }
+        /* Insights / analysis panels */
+        .insight-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius);
+            padding: 18px 22px;
+            box-shadow: var(--shadow);
+            margin-bottom: 14px;
+        }
+        .insight-card h4 {
+            font-size: 14px; font-weight: 700; color: var(--primary);
+            margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+        }
+        .insight-card p, .insight-card li {
+            font-size: 13px; color: var(--text-primary); line-height: 1.75;
+        }
+        .insight-card ul { padding-left: 18px; margin-top: 4px; }
+        .insight-card .hl { font-weight: 700; color: var(--primary-dark); }
+        .insight-card .hl-fe { font-weight: 700; color: var(--frontend); }
+        .insight-card .hl-be { font-weight: 700; color: var(--backend); }
+        .insight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        @media (max-width: 720px) { .insight-grid { grid-template-columns: 1fr; } }
+        .chart-note {
+            font-size: 12.5px; color: var(--text-secondary); line-height: 1.7;
+            margin-top: 12px; padding: 10px 14px;
+            background: rgba(37,99,235,0.05); border-radius: 8px;
+        }
+        .chart-note .hl { font-weight: 700; color: var(--primary-dark); }
+        /* Role badges */
+        .role-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            color: white;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        .role-badge.frontend { background: var(--frontend); }
+        .role-badge.backend { background: var(--backend); }
+        /* Coefficient badge */
+        .coeff-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            background: #fef3c7;
+            color: #92400e;
+            border: 1px solid #fcd34d;
+            margin-left: 6px;
+        }
+        /* Role section */
+        .role-section { margin-bottom: 24px; }
+        .role-section-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding: 8px 16px;
+            border-radius: 8px;
+        }
+        .role-section-header.frontend {
+            background: #f5f3ff;
+            border: 1px solid #ddd6fe;
+        }
+        .role-section-header.backend {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+        }
+        .role-section-header h3 { font-size: 16px; font-weight: 700; }
+        .role-section-header.frontend h3 { color: var(--frontend); }
+        .role-section-header.backend h3 { color: var(--backend); }
+        /* Score Ranking Table */
+        .score-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+        .score-table th {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            padding: 12px 12px;
+            text-align: center;
+            font-weight: 600;
+            position: sticky; top: 0;
+        }
+        .score-table th:first-child { text-align: center; width: 40px; }
+        .score-table th:nth-child(2) { text-align: left; }
+        .score-table td {
+            padding: 10px 12px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+        .score-table td:first-child { text-align: center; }
+        .score-table td:nth-child(2) { text-align: left; font-weight: 600; }
+        .score-table tr:hover { background: #eff6ff; }
+        .score-table .top-3 td:first-child { font-weight: 700; color: var(--primary); }
+        .score-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 32px; height: 24px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 12px;
+            color: white;
+        }
+        .add-lines { color: #16a34a; }
+        .del-lines { color: #dc2626; }
+        /* Charts */
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+        .chart-container { position: relative; height: 350px; }
+        /* Dev Profile Cards */
+        .profile-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 20px;
+        }
+        .profile-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s;
+        }
+        .profile-card.frontend-card { border-left: 4px solid var(--frontend); }
+        .profile-card.backend-card { border-left: 4px solid var(--backend); }
+        .profile-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .profile-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        .profile-name { font-size: 18px; font-weight: 700; color: var(--primary); }
+        .profile-score-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 16px;
+            color: white;
+        }
+        .profile-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 13px;
+        }
+        .profile-metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px dashed var(--border);
+        }
+        .profile-metric .metric-label { color: var(--text-secondary); }
+        .profile-metric .metric-value { font-weight: 600; color: var(--text); }
+        .profile-metric .metric-value.adjusted { color: #92400e; font-style: italic; }
+        /* Dimension breakdown bars */
+        .dim-bar-container { margin-top: 12px; }
+        .dim-bar-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+        .dim-bar-label { width: 100px; color: var(--text-secondary); flex-shrink: 0; }
+        .dim-bar-track {
+            flex: 1;
+            height: 14px;
+            background: #e2e8f0;
+            border-radius: 7px;
+            overflow: hidden;
+            margin-right: 8px;
+        }
+        .dim-bar-fill {
+            height: 14px;
+            border-radius: 7px;
+            transition: width 0.6s ease;
+        }
+        .dim-bar-value { width: 36px; text-align: right; font-weight: 600; color: var(--text); }
+        /* Track switcher */
+        .track-switcher {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            align-items: center;
+        }
+        .track-btn {
+            padding: 8px 20px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-card);
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+        .track-btn:hover { background: #eff6ff; }
+        .track-btn.active-intra {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+        .track-btn.active-cross {
+            background: var(--warning);
+            color: white;
+            border-color: var(--warning);
+        }
+        .track-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        /* Repo summary */
+        .repo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        .repo-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s;
+        }
+        .repo-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+        .repo-card .repo-name { font-weight: 600; font-size: 14px; color: var(--primary); }
+        .repo-card .repo-desc { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+        /* Methodology */
+        .methodology {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: var(--radius);
+            padding: 20px 24px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        .methodology h3 { color: var(--primary); margin-bottom: 12px; }
+        .methodology ul { margin-left: 20px; }
+        .methodology li { margin-bottom: 6px; }
+        .score-formula {
+            background: #dbeafe;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 12px 0;
+            font-size: 12px;
+        }
+        .score-formula table { width: 100%; }
+        .score-formula td { padding: 3px 8px; }
+        .coeff-box {
+            background: #fef3c7;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 12px 0;
+            font-size: 13px;
+            color: #92400e;
+        }
+        .coeff-box strong { color: #78350f; }
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-light);
+            font-size: 12px;
+        }
+        /* Tabs */
+        .tab-container { margin-bottom: 16px; }
+        .tab-buttons { display: flex; gap: 8px; margin-bottom: 16px; }
+        .tab-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-card);
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+        .tab-btn:hover { background: #eff6ff; }
+        .tab-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        @media (max-width: 768px) {
+            .chart-grid { grid-template-columns: 1fr; }
+            .profile-grid { grid-template-columns: 1fr; }
+            .container { padding: 16px; }
+            .header { padding: 24px 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>云效代码审计报告</h1>
+        <p id="report-period">分析周期：2026-06-22 至 2026-07-22 | 工作效能分析（方案E：双轨评分）</p>
+    </div>
+
+    <div class="container">
+        <!-- Meta Bar -->
+        <div class="meta-bar" id="meta-bar"></div>
+
+        <!-- Coefficient Explanation Banner -->
+        <div class="coeff-box" id="coeff-banner">
+            <strong>⚡ 方案E — 双轨评分规则：</strong><br/>
+            前端代码（Vue/HTML/CSS）每行思考密度约为后端（Java/C#）的 <strong>1/1.5</strong>，因此跨职能对比时，前端行数类指标乘以 <strong>×0.6</strong> 折算系数。<br/>
+            <span style="font-size:12px">仅作用于总有效产出、日均产出、提交粒度三个维度；删行占比、连续性不折算。</span><br/>
+            <strong>组内排名 = 原始数据（铁数据）</strong> | <strong>全员排名 = 折算后排名（参考值）</strong>
+        </div>
+
+        <!-- Section 0: Executive Summary / Data Insights -->
+        <div class="section">
+            <div class="section-title">🔍 数据分析洞察</div>
+            <div id="exec-summary"></div>
+            <div class="insight-grid" id="insight-grid"></div>
+        </div>
+
+        <!-- Section 1: Role-Grouped Score Ranking -->
+        <div class="section">
+            <div class="section-title">🏆 组内效能排名（铁数据 · 原始数据）</div>
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+                同职能组内百分位排名，<strong>不受系数影响</strong>，是公平的铁数据。
+                <span style="color:var(--frontend)">紫色</span>=前端，<span style="color:var(--backend)">蓝色</span>=后端。
+                <span id="dim-weight-caption"></span>
+            </p>
+            <div id="role-ranking-container"></div>
+        </div>
+
+        <!-- Section 2: Cross-group Ranking -->
+        <div class="section">
+            <div class="section-title">📊 全员折算排名（参考值 · 前端×0.6）</div>
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
+                前端行数类指标已乘 0.6 折算后，再与后端一起百分位排名。折算后指标以 <span class="coeff-badge">×0.6</span> 标注。
+            </p>
+            <div class="card">
+                <table class="score-table" id="cross-score-table">
+                    <thead>
+                        <tr>
+                            <th>全员排名</th>
+                            <th>开发者</th>
+                            <th>职能</th>
+                            <th>组内排名</th>
+                            <th>全员评分</th>
+                            <th>总有效产出</th>
+                            <th>日均产出</th>
+                            <th>提交粒度</th>
+                            <th>删行占比</th>
+                            <th class="defect-col">缺陷数</th>
+                            <th class="defect-col">缺陷密度<br/><span style="font-size:10px;font-weight:400">个/千行·越低越好</span></th>
+                            <th class="effort-col">工时<br/><span style="font-size:10px;font-weight:400">小时·投入</span></th>
+                            <th>连续性</th>
+                            <th>有效增行</th>
+                            <th>有效删行</th>
+                            <th>活跃天</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cross-score-body"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Section 4: Charts - Tabs -->
+        <div class="section">
+            <div class="section-title">📈 产出趋势</div>
+            <div class="tab-container">
+                <div class="tab-buttons" id="chart-tabs">
+                    <button class="tab-btn active" data-tab="trend">周度产出趋势</button>
+                    <button class="tab-btn" data-tab="commits">提交与活跃</button>
+                </div>
+                <div class="tab-content active" id="tab-trend">
+                    <div class="card">
+                        <h3 style="font-size:14px;margin-bottom:12px;color:var(--text-secondary)">各开发者周度有效产出趋势</h3>
+                        <div class="chart-container"><canvas id="chart-trend"></canvas></div>
+                        <div class="chart-note" id="note-trend"></div>
+                    </div>
+                </div>
+                <div class="tab-content" id="tab-commits">
+                    <div class="card">
+                        <h3 style="font-size:14px;margin-bottom:12px;color:var(--text-secondary)">提交次数 & 活跃天数</h3>
+                        <div class="chart-container"><canvas id="chart-commits"></canvas></div>
+                        <div class="chart-note" id="note-commits"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section 5: Methodology -->
+        <div class="section">
+            <div class="section-title">📋 审计口径与评分方法</div>
+            <div class="methodology">
+                <h3>有效行数定义与过滤规则</h3>
+                <ul>
+                    <li><strong>Merge 提交</strong>：已剔除（parentIds ≥ 2 的提交不计入）</li>
+                    <li><strong>依赖锁文件</strong>：package-lock.json / yarn.lock / pnpm-lock.yaml 等不计入</li>
+                    <li><strong>文档文件</strong>：.md / .markdown / .rst / .adoc 等文档不计入工作量</li>
+                    <li><strong>编译产物</strong>：.min.js / .map / dist/ / build/ / target/ 等不计入</li>
+                    <li><strong>二进制文件</strong>：.jar / .class / 图片 / 字体 / 压缩包 不计入</li>
+                    <li><strong>纯格式化改动</strong>：仅含空白/缩进变化的行不计入</li>
+                    <li><strong>文件重命名/搬运</strong>：renamedFile 无内容变化的不计入</li>
+                    <li><strong>统计范围</strong>：所有分支去重（按 commit SHA 去重），<span id="meth-period">最近一个月</span></li>
+                    <li id="meth-identity"><strong>身份归一化</strong>：多个 Git 身份已按邮箱归一并手动合并同人</li>
+                </ul>
+
+                <h3 style="margin-top:16px">方案E — 双轨评分规则</h3>
+                <div class="coeff-box">
+                    <strong>前端折算系数 = ×0.6</strong><br/>
+                    前端代码（Vue/HTML/CSS）天然比后端代码（Java/C#）膨胀约 1.5 倍（1 单元功能 ≈ 3-5 倍行数 vs 1 倍行数），因此跨职能对比时，前端的行数类指标乘以 0.6 折算。<br/><br/>
+                    <strong>受折算影响的维度</strong>：总有效产出、日均产出、提交粒度（均基于行数计算）<br/>
+                    <strong>不受折算影响的维度</strong>：删行占比（百分比）、连续性（天数）、缺陷密度（比值）<br/><br/>
+                    <strong>组内排名（Track 1）</strong>：原始数据，同职能组内百分位排名 → 铁数据，无争议<br/>
+                    <strong>全员排名（Track 2）</strong>：折算后数据，全员百分位排名 → 参考值，便于跨职能宏观对比
+                </div>
+
+                <h3 style="margin-top:16px" id="meth-dim-title">评分维度与权重</h3>
+                <div class="score-formula">
+                    <table id="meth-weight-table"></table>
+                </div>
+                <p style="margin-top:12px;color:var(--text-secondary);font-size:13px;background:rgba(37,99,235,0.05);padding:10px 14px;border-radius:8px">
+                    <strong>📌 口径说明（主维度）</strong>：主维度采用<strong>总有效产出</strong>（周期内有效增删行总数），而非"日均产出（÷活跃天）"。
+                    原因是"活跃天"仅统计有提交的天数，会把没提交代码的工作日排除在分母外——导致<strong>越勤奋（活跃天越多）日均被摊薄越吃亏，突击式提交反而虚高</strong>。
+                    固定时间窗、成员全程在职时，用总量口径最公平、最难被分母操纵。
+                </p>
+                <p style="margin-top:12px;color:var(--text-secondary);font-size:13px;background:rgba(244,63,94,0.05);padding:10px 14px;border-radius:8px" id="meth-defect-note">
+                    <strong>🐞 口径说明（缺陷密度）</strong>：缺陷密度 = 缺陷数 ÷ 千有效行(KLOC)，为<strong>负向质量维度</strong>（密度越低评分越高）。
+                    缺陷来自云效工作项，按<strong>指派负责人（谁负责修复该块）</strong>归属。用比值而非绝对数量，可消除"写得多的人缺陷绝对数自然多"的偏差，反映单位产出的真实质量。
+                </p>
+                <p style="margin-top:12px;color:var(--text)">
+                    <strong>⚠️ 重要提醒</strong>：本评分仅反映代码产出维度的效率，不代表综合工作价值。
+                    重构、解决复杂问题、技术调研、架构设计等工作可能行数很少但价值极高。
+                    本报告仅作为辅助参考，不建议作为绩效评估的唯一依据。
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p id="footer-meta">云效代码审计报告 · 方案E（双轨评分） | 由 WorkBuddy AI 自动生成 | 数据来源：阿里云云效 Codeup</p>
+        <p id="footer-time"></p>
+    </div>
+
+    <script>
+        // === Load data ===
+        const DATA = {/* DATA_PLACEHOLDER */};
+        const FE_COEFF = DATA.frontend_coefficient || 0.6;
+        const LINE_DIMS = DATA.line_based_dims || ['total_output', 'daily_output', 'commit_gran'];
+        let currentTrack = 'intra';
+
+        function getScoreColor(score) {
+            if (score >= 80) return '#10b981';
+            if (score >= 60) return '#2563eb';
+            if (score >= 40) return '#f59e0b';
+            return '#ef4444';
+        }
+        function getRoleColor(role) {
+            return role === 'frontend' ? '#8b5cf6' : '#2563eb';
+        }
+        function getRoleBg(role) {
+            return role === 'frontend' ? 'rgba(139,92,246,0.15)' : 'rgba(37,99,235,0.15)';
+        }
+        function getDimColor(dim) {
+            const colors = {
+                'total_output': '#2563eb', 'daily_output': '#0ea5e9', 'commit_gran': '#8b5cf6',
+                'deletion_ratio': '#10b981', 'streak': '#ec4899', 'defect_density': '#f43f5e',
+                'work_hours': '#f59e0b'
+            };
+            return colors[dim] || '#64748b';
+        }
+        const DIM_LABELS = {
+            'total_output': '总有效产出', 'daily_output': '日均产出', 'commit_gran': '提交粒度',
+            'deletion_ratio': '删行占比', 'streak': '连续性', 'defect_density': '缺陷密度(质量)',
+            'work_hours': '工时投入'
+        };
+        // 维度顺序：优先用数据里的 dimension_weights（随脚本配置自动变化），回退到默认列表
+        const DEFAULT_DIM_ORDER = ['total_output', 'defect_density', 'daily_output', 'deletion_ratio', 'commit_gran', 'work_hours', 'streak'];
+        const HAS_DEFECT = !!(DATA.dimension_weights && DATA.dimension_weights.defect_density != null);
+        const HAS_EFFORT = !!(DATA.dimension_weights && DATA.dimension_weights.work_hours != null);
+        const DIM_LIST = DEFAULT_DIM_ORDER.filter(d => DATA.dimension_weights && DATA.dimension_weights[d] != null);
+
+        // ============ 数据分析洞察（全部由真实数据动态推导，口径变化时自动更新） ============
+        function fmtNum(n) {
+            return (n == null) ? '-' : Number(n).toLocaleString('zh-CN');
+        }
+        function pct(part, whole) {
+            if (!whole) return '0';
+            return (part / whole * 100).toFixed(1);
+        }
+        function renderInsights(data, devs, frontendDevs, backendDevs, allByCross) {
+            const meta = data.metadata;
+            const weights = data.dimension_weights || {};
+            const N = devs.length;
+
+            const totalEff = devs.reduce((s, d) => s + (d.total_effective || 0), 0);
+            const totalAdd = devs.reduce((s, d) => s + (d.effective_additions || 0), 0);
+            const totalDel = devs.reduce((s, d) => s + (d.effective_deletions || 0), 0);
+            const totalCommits = devs.reduce((s, d) => s + (d.commits || 0), 0);
+            const feEff = frontendDevs.reduce((s, d) => s + (d.total_effective || 0), 0);
+            const beEff = backendDevs.reduce((s, d) => s + (d.total_effective || 0), 0);
+
+            const dStart = new Date(meta.since), dEnd = new Date(meta.until);
+            const spanDays = Math.round((dEnd - dStart) / 86400000);
+
+            const byCross = [...devs].sort((a, b) => b.cross_composite - a.cross_composite);
+            const byTotal = [...devs].sort((a, b) => b.total_effective - a.total_effective);
+            const byDelRatio = [...devs].sort((a, b) => b.deletion_ratio - a.deletion_ratio);
+            const byStreak = [...devs].sort((a, b) => b.longest_streak - a.longest_streak);
+            const byGran = [...devs].sort((a, b) => b.commit_granularity - a.commit_granularity);
+            const topCross = byCross[0];
+            const feTop = frontendDevs[0], beTop = backendDevs[0];
+
+            // ---- 执行摘要 ----
+            const wsorted = Object.entries(weights).sort((a, b) => b[1] - a[1]);
+            const weightStr = wsorted.map(([k, v]) => `${DIM_LABELS[k] || k} ${v}%`).join(' · ');
+            document.getElementById('exec-summary').innerHTML = `
+                <div class="insight-card" style="grid-column:1/-1">
+                    <h4>📌 执行摘要</h4>
+                    <p>
+                        本报告统计 <span class="hl">${meta.since.slice(0,10)}</span> 至 <span class="hl">${meta.until.slice(0,10)}</span>
+                        （约 <span class="hl">${spanDays}</span> 天）内 <span class="hl">${meta.active_repos}/${meta.total_repos}</span>
+                        个活跃仓库的代码提交。剔除 merge、锁文件、文档(.md)、编译产物及二进制后，
+                        <span class="hl">${N}</span> 名开发者共产生 <span class="hl">${fmtNum(meta.non_merge_commits)}</span> 次有效提交、
+                        <span class="hl">${fmtNum(totalEff)}</span> 行有效代码（增 <span class="hl-be">${fmtNum(totalAdd)}</span> / 删 <span class="hl-fe">${fmtNum(totalDel)}</span>）。
+                    </p>
+                    <p style="margin-top:8px">
+                        评分采用<strong>双轨制</strong>：组内排名用原始数据（铁数据），全员排名对前端行数类指标乘 <span class="hl">${FE_COEFF}</span> 折算。
+                        权重分配：<span class="hl">${weightStr}</span>。
+                        全员折算排名第一为 <span class="hl">${topCross.display_name}</span>（${topCross.role_label}，${topCross.cross_composite} 分）；
+                        前端组内第一 <span class="hl-fe">${feTop ? feTop.display_name : '-'}</span>，后端组内第一 <span class="hl-be">${beTop ? beTop.display_name : '-'}</span>。
+                    </p>
+                </div>`;
+
+            // ---- 洞察卡片 ----
+            const cards = [];
+            const top3Eff = byCross.slice(0, Math.min(3, N)).reduce((s, d) => s + (d.total_effective || 0), 0);
+            const totalLeaderGap = byTotal.length > 1 && byTotal[1].total_effective
+                ? (byTotal[0].total_effective / byTotal[1].total_effective).toFixed(1) : '-';
+            cards.push(`
+                <div class="insight-card">
+                    <h4>⚡ 产出规模与集中度</h4>
+                    <ul>
+                        <li>总有效产出榜首 <span class="hl">${byTotal[0].display_name}</span>（${fmtNum(byTotal[0].total_effective)} 行），
+                            约为第二名的 <span class="hl">${totalLeaderGap}×</span>，头部效应明显。</li>
+                        <li>产出前 ${Math.min(3, N)} 名合计贡献 <span class="hl">${pct(top3Eff, totalEff)}%</span> 的有效代码量，
+                            团队产出集中在少数核心成员。</li>
+                        <li>人均有效产出约 <span class="hl">${fmtNum(Math.round(totalEff / N))}</span> 行、有效提交 <span class="hl">${(totalCommits / N).toFixed(0)}</span> 次。</li>
+                    </ul>
+                </div>`);
+
+            const feAvgTotal = frontendDevs.length ? feEff / frontendDevs.length : 0;
+            const beAvgTotal = backendDevs.length ? beEff / backendDevs.length : 0;
+            const feBeRatio = beAvgTotal ? (feAvgTotal / beAvgTotal).toFixed(2) : '-';
+            cards.push(`
+                <div class="insight-card">
+                    <h4>🎭 前后端结构对比</h4>
+                    <ul>
+                        <li>团队构成：<span class="hl-fe">前端 ${frontendDevs.length} 人</span> · <span class="hl-be">后端 ${backendDevs.length} 人</span>；
+                            前端贡献 <span class="hl-fe">${pct(feEff, totalEff)}%</span>、后端 <span class="hl-be">${pct(beEff, totalEff)}%</span> 有效行数。</li>
+                        <li>前端人均总产出 <span class="hl-fe">${fmtNum(Math.round(feAvgTotal))}</span> 行 vs 后端 <span class="hl-be">${fmtNum(Math.round(beAvgTotal))}</span> 行，
+                            前端约为后端的 <span class="hl">${feBeRatio}×</span>。</li>
+                        <li>这正是引入 <span class="hl">×${FE_COEFF}</span> 折算系数的原因——前端代码单位功能天然膨胀，折算后跨职能对比更公平。</li>
+                    </ul>
+                </div>`);
+
+            const avgDelRatio = devs.reduce((s, d) => s + d.deletion_ratio, 0) / N;
+            cards.push(`
+                <div class="insight-card">
+                    <h4>🧹 重构与代码清理</h4>
+                    <ul>
+                        <li>删行占比最高 <span class="hl">${byDelRatio[0].display_name}</span>（<span class="hl">${byDelRatio[0].deletion_ratio}%</span>），重构/清理意识最强；
+                            最低 ${byDelRatio[N-1].display_name}（${byDelRatio[N-1].deletion_ratio}%）以新增为主。</li>
+                        <li>团队平均删行占比 <span class="hl">${avgDelRatio.toFixed(1)}%</span>；健康迭代通常伴随一定比例删除，纯堆砌新增未必是好信号。</li>
+                        <li>全团队累计删除 <span class="hl-fe">${fmtNum(totalDel)}</span> 行，占总变更 <span class="hl">${pct(totalDel, totalAdd + totalDel)}%</span>。</li>
+                    </ul>
+                </div>`);
+
+            cards.push(`
+                <div class="insight-card">
+                    <h4>📆 工作节奏与提交习惯</h4>
+                    <ul>
+                        <li>连续活跃最长 <span class="hl">${byStreak[0].display_name}</span>（<span class="hl">${byStreak[0].longest_streak} 天</span>），节奏最稳定。</li>
+                        <li>提交粒度最大 <span class="hl">${byGran[0].display_name}</span>（${fmtNum(byGran[0].commit_granularity)} 行/次），单次提交承载工作量最重；粒度过大也可能提示拆分不足。</li>
+                        <li>周期内人均活跃 <span class="hl">${(devs.reduce((s, d) => s + d.active_days, 0) / N).toFixed(0)}</span> 天，活跃度反映投入的持续性而非单点爆发。</li>
+                    </ul>
+                </div>`);
+
+            // ---- 缺陷质量卡片（有缺陷数据时才显示）----
+            if (HAS_DEFECT) {
+                const totalDefects = devs.reduce((s, d) => s + (d.defect_count || 0), 0);
+                const withDensity = devs.filter(d => d.defect_density != null);
+                const byDefCntDesc = [...devs].sort((a, b) => (b.defect_count || 0) - (a.defect_count || 0));
+                const byDensityAsc = [...withDensity].sort((a, b) => (a.defect_density || 0) - (b.defect_density || 0));
+                const byDensityDesc = [...withDensity].sort((a, b) => (b.defect_density || 0) - (a.defect_density || 0));
+                const avgDensity = withDensity.length ? (withDensity.reduce((s, d) => s + (d.defect_density || 0), 0) / withDensity.length) : 0;
+                const bestQ = byDensityAsc[0], worstQ = byDensityDesc[0];
+                const mostCnt = byDefCntDesc[0];
+                const dmeta = data.defects_meta || {};
+                cards.push(`
+                    <div class="insight-card">
+                        <h4>🐞 缺陷质量分析（缺陷密度）</h4>
+                        <ul>
+                            <li>周期内团队共 <span class="hl">${totalDefects}</span> 个缺陷（按指派负责人归属），人均 <span class="hl">${(totalDefects / N).toFixed(1)}</span> 个。</li>
+                            <li>缺陷绝对数最多 <span class="hl">${mostCnt.display_name}</span>（<span class="hl">${mostCnt.defect_count}</span> 个）——但绝对数受产出规模影响，需看密度。</li>
+                            <li>单位产出质量最优 <span class="hl">${bestQ.display_name}</span>（每千行仅 <span class="hl">${bestQ.defect_density}</span> 个缺陷）；
+                                最高 ${worstQ.display_name}（每千行 <span class="hl">${worstQ.defect_density}</span> 个），团队均值 <span class="hl">${avgDensity.toFixed(2)}</span>。</li>
+                            <li><strong>口径</strong>：缺陷密度 = 缺陷数 ÷ 千有效行(KLOC)，作负向质量维度（越低越好），权重 <span class="hl">${weights.defect_density}%</span>，用比值消除"产出多缺陷绝对数自然多"的偏差。</li>
+                        </ul>
+                    </div>`);
+            }
+
+            // ---- 工时投入卡片 ----
+            // 有工时数据就展示：纳入评分(HAS_EFFORT)时展示分布；未纳入(填报率过低)时如实说明为何不计分。
+            const emeta = data.effort_meta;
+            if (emeta) {
+                const fillRate = emeta.fill_rate != null ? emeta.fill_rate : 0;
+                const totalH = emeta.total_hours != null ? emeta.total_hours : 0;
+                const nPeople = emeta.distinct_people != null ? emeta.distinct_people : 0;
+                if (HAS_EFFORT) {
+                    const withH = devs.filter(d => d.work_hours != null && d.work_hours > 0);
+                    const byHDesc = [...devs].sort((a, b) => (b.work_hours || 0) - (a.work_hours || 0));
+                    const topH = byHDesc[0];
+                    const teamH = devs.reduce((s, d) => s + (d.work_hours || 0), 0);
+                    cards.push(`
+                        <div class="insight-card">
+                            <h4>⏱️ 任务工时投入</h4>
+                            <ul>
+                                <li>周期内被审计成员共登记 <span class="hl">${teamH.toFixed(1)}</span> 小时任务工时，人均 <span class="hl">${(teamH / N).toFixed(1)}</span> 小时。</li>
+                                <li>投入最多 <span class="hl">${topH.display_name}</span>（<span class="hl">${topH.work_hours}</span> 小时）；${withH.length}/${N} 人有工时记录。</li>
+                                <li><strong>口径</strong>：按<strong>任务负责人(assignedTo)</strong>归口，每个工作项取值 = 实际工时优先、无实际则用预计工时兜底${emeta.items_by_estimate ? `（其中 <span class="hl">${emeta.items_by_estimate}</span> 项来自预计兜底）` : ''}。作低权重"投入"维度（权重 <span class="hl">${weights.work_hours}%</span>），工时属投入非产出，权重刻意压低。</li>
+                            </ul>
+                        </div>`);
+                } else {
+                    cards.push(`
+                        <div class="insight-card" style="border-left:4px solid #f59e0b">
+                            <h4>⏱️ 任务工时投入（数据不足，未纳入评分）</h4>
+                            <ul>
+                                <li>周期内云效工时<strong>填报率仅 <span class="hl">${fillRate}%</span></strong>（共 ${emeta.total_items || '?'} 个工作项，仅 ${emeta.items_with_effort || 0} 个填了工时），登记总量 ${totalH} 小时、仅 ${nPeople} 人填写。</li>
+                                <li>因<strong>缺少工时明细数据</strong>，工时维度未纳入评分；待采集到工时数据后重跑，本维度会自动生效并计入评分。</li>
+                                <li>注：只要存在工时数据即固定纳入 7 维评分（填报率偏低仅作提示，不再自动剔除）。</li>
+                            </ul>
+                        </div>`);
+                }
+            }
+
+            document.getElementById('insight-grid').innerHTML = cards.join('');
+
+            // ---- Section 1 权重说明（随权重自动更新） ----
+            document.getElementById('dim-weight-caption').innerHTML =
+                `评分维度：${weightStr}（共 ${wsorted.length} 维，总有效产出占主导${HAS_DEFECT ? '，缺陷密度为负向质量维度' : ''}）。`;
+
+            // ---- 方法论：动态渲染权重表 + 周期 ----
+            const DIM_DESC = {
+                'total_output': ['= 周期内有效增删行总数 → 衡量整体产能，不受活跃天分母影响', '⚠️ 前端×' + FE_COEFF],
+                'defect_density': ['= 缺陷数 / 千有效行(KLOC) → 负向质量维度，单位产出缺陷越少评分越高', '不折算'],
+                'daily_output': ['= 有效增删行总数 / 活跃天数 → 辅助衡量活跃日产出效率', '⚠️ 前端×' + FE_COEFF],
+                'deletion_ratio': ['= 有效删行 / 有效增删总和 → 衡量重构与清理能力', '不折算'],
+                'commit_gran': ['= 有效增删行总数 / 提交数 → 衡量每次提交的工作深度', '⚠️ 前端×' + FE_COEFF],
+                'work_hours': ['= 按任务负责人归口，各工作项实际工时优先、无则预计工时兜底，求和(小时) → 低权重"投入"维度，正向', '不折算'],
+                'streak': ['= 最长连续活跃天数 → 衡量工作稳定性', '不折算'],
+            };
+            const mwt = document.getElementById('meth-weight-table');
+            if (mwt) {
+                mwt.innerHTML = DIM_LIST.map(d => {
+                    const [desc, adj] = DIM_DESC[d] || ['', '不折算'];
+                    const adjStyle = adj.indexOf('前端') >= 0 ? ' style="color:#92400e"' : '';
+                    return `<tr><td><strong>${DIM_LABELS[d] || d}</strong>（${weights[d]}%）</td><td>${desc}</td><td${adjStyle}>${adj}</td></tr>`;
+                }).join('');
+            }
+            const mdt = document.getElementById('meth-dim-title');
+            if (mdt) mdt.textContent = `评分维度与权重（${DIM_LIST.length}维${HAS_DEFECT ? ' · 含缺陷质量维度' : ' · 纯代码维度'}）`;
+            const mp = document.getElementById('meth-period');
+            if (mp) mp.textContent = spanDays <= 45 ? '最近一个月' : (spanDays <= 100 ? '最近三个月' : `最近 ${spanDays} 天`);
+            const mdn = document.getElementById('meth-defect-note');
+            if (mdn && !HAS_DEFECT) mdn.style.display = 'none';
+            const fm = document.getElementById('footer-meta');
+            if (fm) fm.textContent = `云效代码审计报告 · 方案E（双轨评分 · ${DIM_LIST.length}维） | 由 WorkBuddy AI 自动生成 | 数据来源：阿里云云效 Codeup`;
+
+            // ---- 图表下方说明 ----
+            const noteTrend = document.getElementById('note-trend');
+            if (noteTrend) noteTrend.innerHTML =
+                `<strong>读图提示：</strong>横轴为周起始日期，纵轴为该周有效行数。曲线陡升多为版本冲刺或大功能落地，回落至低位可能是评审、联调或休假周。
+                关注<strong>持续稳定的中高位曲线</strong>比单周尖峰更能反映真实产能——<span class="hl">${byTotal[0].display_name}</span>、<span class="hl">${topCross.display_name}</span> 整体处于第一梯队。`;
+            const noteCommits = document.getElementById('note-commits');
+            if (noteCommits) noteCommits.innerHTML =
+                `<strong>读图提示：</strong>柱状为提交次数、折线为活跃天数。二者背离时需留意：<strong>提交多但活跃天少</strong>可能是集中式提交，
+                <strong>活跃天多但提交少</strong>可能是大颗粒提交或以调试为主。结合提交粒度一起看更能还原真实工作形态。`;
+        }
+
+        function renderReport(data) {
+            const devs = Object.entries(data.developer_stats)
+                .map(([key, stats]) => ({ key, ...stats }));
+
+            const frontendDevs = devs.filter(d => d.role === 'frontend')
+                .sort((a, b) => b.intra_composite - a.intra_composite);
+            const backendDevs = devs.filter(d => d.role === 'backend')
+                .sort((a, b) => b.intra_composite - a.intra_composite);
+
+            const allByCross = [...devs].sort((a, b) => b.cross_composite - a.cross_composite);
+
+            // === Meta bar ===
+            const metaBar = document.getElementById('meta-bar');
+            const metaItems = [
+                { label: '总仓库数', value: data.metadata.total_repos },
+                { label: '活跃仓库', value: data.metadata.active_repos },
+                { label: '非merge提交', value: data.metadata.non_merge_commits },
+                { label: '开发者数', value: data.metadata.unique_developers },
+                { label: '前端人数', value: frontendDevs.length },
+                { label: '后端人数', value: backendDevs.length },
+                { label: '前端系数', value: FE_COEFF },
+            ];
+            metaItems.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'meta-item';
+                div.innerHTML = `<div class="label">${item.label}</div><div class="value">${item.value}</div>`;
+                metaBar.appendChild(div);
+            });
+            document.getElementById('report-period').textContent =
+                `分析周期：${data.metadata.since.slice(0,10)} 至 ${data.metadata.until.slice(0,10)} | 方案E：双轨评分（前端×${FE_COEFF}） · ${DIM_LIST.length}维`;
+
+            // === Data Insights (动态生成，随数据/口径自动更新) ===
+            renderInsights(data, devs, frontendDevs, backendDevs, allByCross);
+
+            // === Role-grouped ranking (intra, 铁数据) ===
+            const rankingContainer = document.getElementById('role-ranking-container');
+
+            function renderRoleRanking(roleDevs, roleLabel, roleClass) {
+                const section = document.createElement('div');
+                section.className = 'role-section';
+                const header = document.createElement('div');
+                header.className = `role-section-header ${roleClass}`;
+                header.innerHTML = `<h3>${roleLabel}团队组内排名</h3><span style="font-size:13px;color:var(--text-secondary)">${roleDevs.length} 人 · 原始数据 · ${DIM_LIST.length}维</span>`;
+                section.appendChild(header);
+
+                const tableCard = document.createElement('div');
+                tableCard.className = 'card';
+                const table = document.createElement('table');
+                table.className = 'score-table';
+                const defectHead = HAS_DEFECT ? '<th>缺陷数</th><th>缺陷密度<br/><span style="font-size:10px;font-weight:400">个/千行·越低越好</span></th>' : '';
+                const effortHead = HAS_EFFORT ? '<th>工时<br/><span style="font-size:10px;font-weight:400">小时·投入</span></th>' : '';
+                table.innerHTML = `
+                    <thead><tr>
+                        <th>组内排名</th><th>开发者</th><th>组内评分</th><th>总有效产出</th><th>日均产出</th><th>提交粒度</th>
+                        <th>删行占比</th>${defectHead}${effortHead}<th>连续性</th>
+                        <th>有效增行</th><th>有效删行</th><th>活跃天</th><th>提交数</th>
+                    </tr></thead>
+                `;
+                const tbody = document.createElement('tbody');
+                roleDevs.forEach((dev, idx) => {
+                    const rank = idx + 1;
+                    const tr = document.createElement('tr');
+                    if (rank === 1) tr.className = 'top-3';
+                    const scoreColor = getScoreColor(dev.intra_composite);
+                    const roleBadge = `<span class="role-badge ${roleClass}">${roleLabel}</span>`;
+                    const defectCells = HAS_DEFECT
+                        ? `<td>${dev.defect_count != null ? dev.defect_count : '-'}</td><td><span style="color:${(dev.defect_density||0) <= 0.5 ? '#10b981' : (dev.defect_density||0) <= 1.2 ? '#f59e0b' : '#ef4444'};font-weight:600">${dev.defect_density != null ? dev.defect_density : '-'}</span></td>`
+                        : '';
+                    const effortCells = HAS_EFFORT
+                        ? `<td><span style="color:#f59e0b;font-weight:600">${dev.work_hours != null ? dev.work_hours : '-'}</span></td>`
+                        : '';
+                    tr.innerHTML = `
+                        <td>${rank}</td>
+                        <td>${dev.display_name}${roleBadge}</td>
+                        <td><span class="score-badge" style="background:${scoreColor}">${dev.intra_composite}</span></td>
+                        <td>${fmtNum(dev.total_effective)}</td>
+                        <td>${fmtNum(dev.daily_output)}</td>
+                        <td>${dev.commit_granularity}</td>
+                        <td>${dev.deletion_ratio}%</td>
+                        ${defectCells}${effortCells}
+                        <td>${dev.longest_streak}天</td>
+                        <td class="add-lines">${dev.effective_additions}</td>
+                        <td class="del-lines">${dev.effective_deletions}</td>
+                        <td>${dev.active_days}</td>
+                        <td>${dev.commits}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody);
+                tableCard.appendChild(table);
+                section.appendChild(tableCard);
+                rankingContainer.appendChild(section);
+            }
+            renderRoleRanking(frontendDevs, '前端', 'frontend');
+            renderRoleRanking(backendDevs, '后端', 'backend');
+
+            // === Cross-group ranking table ===
+            const crossBody = document.getElementById('cross-score-body');
+            if (!HAS_DEFECT) {
+                document.querySelectorAll('.defect-col').forEach(el => el.remove());
+            }
+            if (!HAS_EFFORT) {
+                document.querySelectorAll('.effort-col').forEach(el => el.remove());
+            }
+            allByCross.forEach((dev, idx) => {
+                const rank = idx + 1;
+                const tr = document.createElement('tr');
+                if (rank <= 3) tr.className = 'top-3';
+                const scoreColor = getScoreColor(dev.cross_composite);
+                const roleClass = dev.role === 'frontend' ? 'frontend' : 'backend';
+                const roleLabel = dev.role_label;
+                const roleBadge = `<span class="role-badge ${roleClass}">${roleLabel}</span>`;
+                const coeffBadge = dev.role === 'frontend' ? `<span class="coeff-badge">×${FE_COEFF}</span>` : '';
+                const totalOutDisplay = dev.role === 'frontend'
+                    ? `${fmtNum(dev.adjusted_total_output)}${coeffBadge}<br/><span style="font-size:11px;color:var(--text-light)">原始:${fmtNum(dev.total_effective)}</span>`
+                    : `${fmtNum(dev.total_effective)}`;
+                const dailyOutDisplay = dev.role === 'frontend'
+                    ? `${fmtNum(dev.adjusted_daily_output)}${coeffBadge}<br/><span style="font-size:11px;color:var(--text-light)">原始:${fmtNum(dev.daily_output)}</span>`
+                    : `${fmtNum(dev.daily_output)}`;
+                const granDisplay = dev.role === 'frontend'
+                    ? `${dev.adjusted_commit_granularity}${coeffBadge}<br/><span style="font-size:11px;color:var(--text-light)">原始:${dev.commit_granularity}</span>`
+                    : `${dev.commit_granularity}`;
+                tr.innerHTML = `
+                    <td>${rank}</td>
+                    <td>${dev.display_name}${roleBadge}</td>
+                    <td>${roleLabel}</td>
+                    <td>#${dev.role_rank}/${dev.role_total}</td>
+                    <td><span class="score-badge" style="background:${scoreColor}">${dev.cross_composite}</span></td>
+                    <td>${totalOutDisplay}</td>
+                    <td>${dailyOutDisplay}</td>
+                    <td>${granDisplay}</td>
+                    <td>${dev.deletion_ratio}%</td>
+                    ${HAS_DEFECT ? `<td>${dev.defect_count != null ? dev.defect_count : '-'}</td><td><span style="color:${(dev.defect_density||0) <= 0.5 ? '#10b981' : (dev.defect_density||0) <= 1.2 ? '#f59e0b' : '#ef4444'};font-weight:600">${dev.defect_density != null ? dev.defect_density : '-'}</span></td>` : ''}
+                    ${HAS_EFFORT ? `<td><span style="color:#f59e0b;font-weight:600">${dev.work_hours != null ? dev.work_hours : '-'}</span></td>` : ''}
+                    <td>${dev.longest_streak}天</td>
+                    <td class="add-lines">${dev.effective_additions}</td>
+                    <td class="del-lines">${dev.effective_deletions}</td>
+                    <td>${dev.active_days}</td>
+                `;
+                crossBody.appendChild(tr);
+            });
+
+            // === Trend chart ===
+            // 高对比度独立调色板，让每个人颜色差异明显
+            const DISTINCT_COLORS = [
+                '#e6194b', // 红
+                '#3cb44b', // 绿
+                '#4363d8', // 蓝
+                '#f58231', // 橙
+                '#911eb4', // 紫
+                '#42d4f4', // 青
+                '#f032e6', // 品红
+                '#bfef45', // 黄绿
+                '#000075', // 深蓝
+                '#9a6324', // 棕
+            ];
+            const allWeeks = new Set();
+            const weekToDate = {};
+            devs.forEach(dev => {
+                if (dev.weekly_trend) dev.weekly_trend.forEach(w => {
+                    allWeeks.add(w.week);
+                    if (w.week_start) weekToDate[w.week] = w.week_start;
+                });
+            });
+            const sortedWeeks = Array.from(allWeeks).sort();
+            const weekDateLabels = sortedWeeks.map(w => weekToDate[w] || w);
+            const devColors = devs.map((d, i) => DISTINCT_COLORS[i % DISTINCT_COLORS.length]);
+            const devBgColors = devColors.map(c => c + '22');
+
+            new Chart(document.getElementById('chart-trend'), {
+                type: 'line',
+                data: {
+                    labels: weekDateLabels,
+                    datasets: devs.map((dev, i) => ({
+                        label: `${dev.display_name}(${dev.role_label})`,
+                        data: sortedWeeks.map(w => {
+                            const found = (dev.weekly_trend || []).find(t => t.week === w);
+                            return found ? found.lines : 0;
+                        }),
+                        borderColor: devColors[i],
+                        backgroundColor: devBgColors[i],
+                        borderWidth: 2.5, fill: false, tension: 0.3,
+                        pointRadius: 4, pointBackgroundColor: devColors[i],
+                    }))
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top', labels: { font: { size: 11 } } } },
+                    scales: {
+                        x: { title: { display: true, text: '周起始日期' }, grid: { display: false } },
+                        y: { title: { display: true, text: '有效行数' }, grid: { color: '#e2e8f0' } }
+                    }
+                }
+            });
+
+            // === Commits chart ===
+            new Chart(document.getElementById('chart-commits'), {
+                type: 'bar',
+                data: {
+                    labels: devs.map(d => `${d.display_name}(${d.role_label})`),
+                    datasets: [
+                        { label: '提交次数', data: devs.map(d => d.commits), backgroundColor: devs.map(d => d.role === 'frontend' ? 'rgba(139,92,246,0.7)' : 'rgba(37,99,235,0.7)'), borderColor: devs.map(d => getRoleColor(d.role)), borderWidth: 1, yAxisID: 'y' },
+                        { label: '活跃天数', data: devs.map(d => d.active_days), type: 'line', borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.2)', pointBackgroundColor: '#f59e0b', borderWidth: 2, fill: true, yAxisID: 'y1' }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { type: 'linear', position: 'left', title: { display: true, text: '提交次数' }, grid: { color: '#e2e8f0' } },
+                        y1: { type: 'linear', position: 'right', title: { display: true, text: '活跃天数' }, grid: { display: false }, min: 0 }
+                    }
+                }
+            });
+
+            // === Footer ===
+            document.getElementById('footer-time').textContent =
+                `生成时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`;
+
+            // === Tab switching ===
+            document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn[data-tab]').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+                });
+            });
+        }
+
+        renderReport(DATA);
+    </script>
+</body>
+</html>

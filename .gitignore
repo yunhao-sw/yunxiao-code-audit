@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 审计数据产物（含真实团队数据，禁止提交）
+*_audit_data.json
+*_timestamps.json
+defects_data.json
+effort_data.json
+enhanced_audit_data.json
+*_report*.html
+*.log
+
+# 环境/密钥
+.env
+*.token
+secrets/
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
